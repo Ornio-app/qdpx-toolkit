@@ -73,11 +73,13 @@ This project originated from work on [Ornio](https://ornio.app), a local-first q
 
 ## Installation
 
+Not yet published to PyPI. From a clone:
+
 ```
-pip install qdpx-toolkit
+pip install -e ".[dev]"
 ```
 
-The distribution name is `qdpx-toolkit`, but the importable package is `refi_qda`:
+On release the distribution will be `qdpx-toolkit`, while the importable package is `refi_qda`:
 
 ```python
 from refi_qda import open_qdpx
