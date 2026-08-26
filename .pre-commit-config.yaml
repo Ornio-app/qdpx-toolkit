@@ -1,0 +1,20 @@
+# Requires the project's dev extras installed first: pip install -e ".[dev]"
+# (mypy runs via `language: system` below, using lxml-stubs from that env,
+# rather than pre-commit's own mirrored mypy environment.)
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [src]

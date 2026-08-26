@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qdpx-toolkit"
+version = "0.1.0"
+description = "A reference implementation of the REFI-QDA (.qdpx) qualitative-data exchange standard."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [
+    { name = "Rad Hourdakis" },
+]
+keywords = ["refi-qda", "qdpx", "qda", "qualitative-research", "interoperability"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Text Processing :: Markup :: XML",
+    "Typing :: Typed",
+]
+
+# Kept deliberately tiny: lxml is the one hard dependency, because stdlib
+# ElementTree cannot validate XML against an XSD. Everything else this
+# library needs (zipfile, dataclasses, pathlib) is in the standard library.
+dependencies = [
+    "lxml>=5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/radh/qdpx-toolkit"
+Issues = "https://github.com/radh/qdpx-toolkit/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "lxml-stubs>=0.5",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/refi_qda"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "conformance/tests"]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["src/refi_qda"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "conformance"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
+    "N",   # pep8-naming
+]
+ignore = [
+    "N818", # exception names don't need an "Error" suffix enforced this strictly
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"conformance/**" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["refi_qda"]
+mypy_path = "src"
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = "lxml.*"
+ignore_missing_imports = true

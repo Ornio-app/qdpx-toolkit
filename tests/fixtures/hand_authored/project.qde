@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<Project xmlns="urn:QDA-XML:project:1.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="urn:QDA-XML:project:1.0 http://schema.qdasoftware.org/versions/Project/v1.0/Project.xsd"
+         name="Sample Study"
+         origin="refi_qda test fixture"
+         basePath="/Users/example/ExternalMedia"
+         creatingUserGUID="10000000-0000-0000-0000-000000000001"
+         creationDateTime="2024-01-15T10:00:00Z"
+         modifyingUserGUID="10000000-0000-0000-0000-000000000001"
+         modifiedDateTime="2024-01-16T12:30:00Z">
+  <Users>
+    <User guid="10000000-0000-0000-0000-000000000001" name="Researcher A"/>
+  </Users>
+  <CodeBook>
+    <Codes>
+      <Code guid="20000000-0000-0000-0000-000000000001" name="Topics" isCodable="false">
+        <Code guid="20000000-0000-0000-0000-000000000002" name="Health" isCodable="true" color="#33cc33">
+          <Description>Anything about physical or mental health</Description>
+          <Code guid="20000000-0000-0000-0000-000000000003" name="Diet" isCodable="true" color="#dc0000">
+            <Description>Food and eating habits</Description>
+          </Code>
+        </Code>
+        <Code guid="20000000-0000-0000-0000-000000000004" name="Wellbeing" isCodable="true" color="#0000ff"/>
+      </Code>
+    </Codes>
+  </CodeBook>
+  <Variables>
+    <Variable guid="30000000-0000-0000-0000-000000000001" name="Age" typeOfVariable="Integer"/>
+    <Variable guid="30000000-0000-0000-0000-000000000002" name="Consented" typeOfVariable="Boolean"/>
+  </Variables>
+  <Cases>
+    <Case guid="d0000000-0000-0000-0000-000000000001" name="Participant 1">
+      <Description>A pseudonymised interview participant.</Description>
+      <CodeRef targetGUID="20000000-0000-0000-0000-000000000002"/>
+      <VariableValue>
+        <VariableRef targetGUID="30000000-0000-0000-0000-000000000001"/>
+        <IntegerValue>34</IntegerValue>
+      </VariableValue>
+      <VariableValue>
+        <VariableRef targetGUID="30000000-0000-0000-0000-000000000002"/>
+        <BooleanValue>true</BooleanValue>
+      </VariableValue>
+      <SourceRef targetGUID="40000000-0000-0000-0000-000000000001"/>
+      <SelectionRef targetGUID="50000000-0000-0000-0000-000000000001"/>
+    </Case>
+  </Cases>
+  <Sources>
+    <TextSource guid="40000000-0000-0000-0000-000000000001" name="Interview 1.txt"
+                plainTextPath="internal://11111111-1111-1111-1111-111111111111.txt"
+                creatingUser="10000000-0000-0000-0000-000000000001" creationDateTime="2024-01-15T10:05:00Z">
+      <PlainTextSelection guid="50000000-0000-0000-0000-000000000001" name="Diet and health"
+                          startPosition="0" endPosition="15">
+        <Coding guid="60000000-0000-0000-0000-000000000001" creatingUser="10000000-0000-0000-0000-000000000001">
+          <CodeRef targetGUID="20000000-0000-0000-0000-000000000002"/>
+        </Coding>
+      </PlainTextSelection>
+      <PlainTextSelection guid="50000000-0000-0000-0000-000000000002" name="health are closely"
+                          startPosition="9" endPosition="23">
+        <!-- Deliberately overlaps with the selection above (chars 9-15) -->
+        <Coding guid="60000000-0000-0000-0000-000000000002" creatingUser="10000000-0000-0000-0000-000000000001">
+          <CodeRef targetGUID="20000000-0000-0000-0000-000000000003"/>
+        </Coding>
+      </PlainTextSelection>
+    </TextSource>
+    <PictureSource guid="40000000-0000-0000-0000-000000000002" name="photo.jpg"
+                   path="internal://22222222-2222-2222-2222-222222222222.jpg">
+      <PictureSelection guid="50000000-0000-0000-0000-000000000003" name="Region of interest"
+                        firstX="10" firstY="20" secondX="100" secondY="200">
+        <Coding guid="60000000-0000-0000-0000-000000000003">
+          <CodeRef targetGUID="20000000-0000-0000-0000-000000000004"/>
+        </Coding>
+      </PictureSelection>
+    </PictureSource>
+    <PDFSource guid="40000000-0000-0000-0000-000000000003" name="doc.pdf"
+               path="internal://33333333-3333-3333-3333-333333333333.pdf">
+      <Representation guid="70000000-0000-0000-0000-000000000001">
+        <PlainTextContent>Notes about diet and health from the document.</PlainTextContent>
+      </Representation>
+      <PDFSelection guid="50000000-0000-0000-0000-000000000004" name="diet and health"
+                    page="0" firstX="18" firstY="45" secondX="577" secondY="234">
+        <Representation guid="70000000-0000-0000-0000-000000000002">
+          <PlainTextContent>diet and health</PlainTextContent>
+        </Representation>
+        <Coding guid="60000000-0000-0000-0000-000000000004">
+          <CodeRef targetGUID="20000000-0000-0000-0000-000000000002"/>
+        </Coding>
+      </PDFSelection>
+    </PDFSource>
+    <AudioSource guid="40000000-0000-0000-0000-000000000004" name="interview.m4a"
+                 path="relative:///Audio/interview.m4a">
+      <Transcript guid="80000000-0000-0000-0000-000000000001"
+                  plainTextPath="internal://11111111-1111-1111-1111-111111111111.txt">
+        <SyncPoint guid="90000000-0000-0000-0000-000000000001" position="0" timeStamp="0"/>
+        <SyncPoint guid="90000000-0000-0000-0000-000000000002" position="20" timeStamp="5000"/>
+        <TranscriptSelection guid="50000000-0000-0000-0000-000000000005"
+                              fromSyncPoint="90000000-0000-0000-0000-000000000001"
+                              toSyncPoint="90000000-0000-0000-0000-000000000002">
+          <Coding guid="60000000-0000-0000-0000-000000000005">
+            <CodeRef targetGUID="20000000-0000-0000-0000-000000000003"/>
+          </Coding>
+        </TranscriptSelection>
+      </Transcript>
+      <AudioSelection guid="50000000-0000-0000-0000-000000000006" begin="1000" end="5000">
+        <Coding guid="60000000-0000-0000-0000-000000000006">
+          <CodeRef targetGUID="20000000-0000-0000-0000-000000000003"/>
+        </Coding>
+      </AudioSelection>
+    </AudioSource>
+    <VideoSource guid="40000000-0000-0000-0000-000000000005" name="clip.mp4"
+                 path="absolute:///Users/example/ExternalMedia/clip.mp4">
+      <VideoSelection guid="50000000-0000-0000-0000-000000000007" begin="2000" end="8000">
+        <Coding guid="60000000-0000-0000-0000-000000000007">
+          <CodeRef targetGUID="20000000-0000-0000-0000-000000000004"/>
+        </Coding>
+      </VideoSelection>
+    </VideoSource>
+  </Sources>
+  <Notes>
+    <Note guid="a0000000-0000-0000-0000-000000000001" name="Research memo">
+      <PlainTextContent>Remember to follow up on diet-related comments.</PlainTextContent>
+    </Note>
+  </Notes>
+  <Links>
+    <Link guid="b0000000-0000-0000-0000-000000000001" name="Memo-Selection Relation"
+          direction="OneWay"
+          originGUID="a0000000-0000-0000-0000-000000000001"
+          targetGUID="50000000-0000-0000-0000-000000000001"/>
+  </Links>
+  <Sets>
+    <Set guid="c0000000-0000-0000-0000-000000000001" name="Diet-related">
+      <MemberCode targetGUID="20000000-0000-0000-0000-000000000003"/>
+      <MemberSource targetGUID="40000000-0000-0000-0000-000000000001"/>
+    </Set>
+  </Sets>
+  <Graphs>
+    <Graph guid="e0000000-0000-0000-0000-000000000001" name="Model">
+      <Vertex guid="e1000000-0000-0000-0000-000000000001" representedGUID="20000000-0000-0000-0000-000000000002"
+              firstX="10" firstY="10" shape="Oval" color="#33cc33"/>
+      <Vertex guid="e1000000-0000-0000-0000-000000000002" representedGUID="20000000-0000-0000-0000-000000000004"
+              firstX="200" firstY="10" shape="Rectangle"/>
+      <Edge guid="e2000000-0000-0000-0000-000000000001"
+            sourceVertex="e1000000-0000-0000-0000-000000000001"
+            targetVertex="e1000000-0000-0000-0000-000000000002"
+            direction="Associative" lineStyle="solid"/>
+    </Graph>
+  </Graphs>
+  <NoteRef targetGUID="a0000000-0000-0000-0000-000000000001"/>
+</Project>
