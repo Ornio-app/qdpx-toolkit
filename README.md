@@ -14,7 +14,7 @@ This project addresses both, as a single open commons: a well-tested exchange fo
 
 ## What this is not
 
-This is not a qualitative analysis application. It has no interface, no coding workflow, no AI orchestration. It is infrastructure that any QDA tool, including proprietary ones, can build on. The proprietary application this project was originally built to support is maintained separately and is out of scope here.
+This is not a qualitative analysis application. It has no interface, no coding workflow, no AI orchestration. It is infrastructure that any QDA tool, including proprietary ones, can build on. The proprietary application this project was originally built to support (Ornio) is maintained separately and is out of scope here.
 
 ## Scope
 
@@ -32,17 +32,20 @@ This is not a qualitative analysis application. It has no interface, no coding w
 This project scopes "under-resourced" deliberately wider than the twenty-four official languages, because the research communities most likely to need this tool work well below that line too:
 
 - **Regional and minority languages** recognised under the [European Charter for Regional or Minority Languages](https://www.coe.int/en/web/european-charter-regional-or-minority-languages) — e.g. Basque, Breton, Sámi, Sorbian, Frisian, Occitan, Welsh, Scottish Gaelic.
-- **Non-standard dialects of well-resourced languages**, which mainstream ASR models are typically not trained on at all even when the standard language is well supported — e.g. Bavarian, Swiss German, Cypriot Greek, and other Greek dialectal varieties, Venetian and other regional Italian varieties.
+- **Non-standard dialects of well-resourced languages**, which mainstream ASR models are typically not trained on at all even when the standard language is well supported — e.g. Bavarian, Swiss German, and multiple varieties of Modern Greek including Cretan, Pontic, and Cypriot, which remain largely absent from production ASR despite growing NLP research interest.
+- **Severely endangered minority languages with almost no digital resources** — e.g. Griko (Italiot Greek), spoken by a shrinking, aging community in Salento, southern Italy, and listed by UNESCO as seriously endangered since 1999.
 - **Language isolates and small communities** with active NLP research groups but minimal commercial tooling — Basque via the [Ixa group](https://www.ixa.eus/) and [SALTMIL](https://saltmil.eu/) being the clearest precedent for what this project follows.
 
 **Initial target languages (Phase 1):**
 
 | Language | Category | Why first |
 |---|---|---|
-| Greek (standard) | METANET Fragmentary | Home language of the lead maintainer; existing test corpus available |
-| Cypriot Greek | Dialect, effectively unsupported | Demonstrates the dialect case, not just the small-language case |
-| [LANGUAGE 2 — e.g. Maltese] | METANET Weak/No-Support | No trained ASR models exist for all major platforms per prior surveys |
-| [LANGUAGE 3 — e.g. Basque or a regional/minority language] | Charter-recognised minority language | Tests the pipeline against an existing SALTMIL-adjacent research community |
+| Standard Modern Greek | METANET Fragmentary | Home language of the lead maintainer; existing test corpus available; reference point for dialect comparisons (11.62–13.7% WER on Common Voice) |
+| Cretan Greek | Dialect, under-resourced | Verified, directly-read baseline: zero-shot Whisper Large-v3 at 58.42% WER, dropping to 28.27% WER / 7.88% CER after fine-tuning XLS-R-greek (Vakirtzian et al., 2024) — the strongest demonstrated result of any Greek dialect studied to date |
+| Pontic Greek | Dialect, under-resourced | A dedicated 2026 speech resource and baseline paper exists (Konstantinidou et al.); this project has not yet obtained the paper's actual WER/CER table and does not cite unverified figures |
+| Griko (Italiot Greek) | UNESCO-listed severely endangered minority language | Confirmed hardest case in the literature: every tested model/configuration exceeds 98% WER (Vakirtzian et al., 2024), driven by Italo-Romance contact, Latin (not Greek) script, and stress-diacritic mismatch — the clearest case for urgency of any language on this list |
+
+This trio is deliberately not arbitrary. Cretan has a directly verified low-resource ASR baseline: Vakirtzian et al. (2024) report zero-shot Whisper Large-v3 at 58.42% WER, dropping to a dialect-low 28.27% WER / 7.88% CER after fine-tuning XLS-R-greek for 35 epochs — the strongest result of any dialect in that study. Griko is separately confirmed, in the same paper, as the hardest case: every tested model and configuration exceeds 98% WER, driven by a combination of Italo-Romance lexical contact, Latin (not Greek) orthography, and heavy use of stress diacritics uncommon in Italian. The same paper identifies Griko's lack of a standardized orthography as a first-class modeling problem, not just a data-scarcity one — this project treats that as a design constraint from the start, not an afterthought. Pontic has a dedicated 2026 speech resource and baseline paper (Konstantinidou et al.), whose exact figures this project has not yet obtained directly and does not cite unverified (see SPEC.md for full details and primary sources).
 
 Additional languages after Phase 1 are prioritised by contributor and research-community interest, not decided unilaterally — see Contributing.
 
@@ -52,7 +55,7 @@ Output is REFI-QDA-compatible: timestamped, speaker-attributable where diarisati
 
 - **Local-first.** Transcription runs entirely on-device. No audio leaves the machine at any point. This is a hard requirement, not a configurable option.
 - **Standards-first.** Output conforms to REFI-QDA, not to any one application's internal format.
-- **Honest about accuracy.** Word error rates for under-resourced languages and dialects will not match commercial models for English. This is documented per-language, not hidden.
+- **Honest about accuracy.** Word error rates for under-resourced languages and dialects will not match commercial models for English. This is documented per-language, with real numbers, not hidden or glossed over.
 - **A commons, not a feature.** This project must be independently useful to a researcher who has never heard of any specific QDA application, and independently useful to any tool vendor who wants to consume it.
 
 ## Status
