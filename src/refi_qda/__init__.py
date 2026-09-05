@@ -1,20 +1,23 @@
-"""refi_qda: a reference implementation reader for the REFI-QDA (.qdpx) standard.
+"""refi_qda: a reference implementation of the REFI-QDA (.qdpx) standard.
 
 REFI-QDA is the "Rotterdam Exchange Format Initiative" qualitative-data
 exchange standard (v1.5, 2019), used by NVivo, ATLAS.ti, MAXQDA and others
 to move coded interview/document projects between tools. This package
-implements the **reader** half of that standard only -- see ``SPEC.md`` in
-the repository root for exactly what is and is not yet covered, and
-``README.md`` for why this project exists. There is currently no writer:
-``qdpx-toolkit`` does not produce ``.qdpx`` files, only parse them.
+implements both the reader and writer halves of that standard -- see
+``SPEC.md`` in the repository root for exactly what is and is not yet
+covered, and ``README.md`` for why this project exists.
 
 The public API is deliberately small:
 
 * :func:`open_qdpx` -- parse a ``.qdpx`` file straight into a
-  :class:`refi_qda.model.Project`. The main entry point for most callers.
-* :func:`refi_qda.parser.parse_qde` -- parse raw ``project.qde`` XML
-  (bytes or str) directly, if you already have it extracted from a
-  container.
+  :class:`refi_qda.model.Project`. The main entry point for most callers
+  reading a project.
+* :func:`write_qdpx` -- the inverse: write a :class:`refi_qda.model.Project`
+  out as a complete ``.qdpx`` file. The main entry point for most callers
+  producing one.
+* :func:`refi_qda.parser.parse_qde` / :func:`to_qde` -- parse or serialise
+  raw ``project.qde`` XML (bytes) directly, if you are working with an
+  already-extracted/not-yet-zipped container.
 * :func:`refi_qda.validator.validate` -- validate ``project.qde``/``.qdc``
   XML against the REFI-QDA XSD (which you must supply yourself; see
   ``conformance/README.md``).
@@ -25,8 +28,9 @@ The public API is deliberately small:
 * :mod:`refi_qda.exceptions` -- the exception hierarchy every deliberate
   error in this package subclasses.
 
-Everything else (the leading-underscore helpers in :mod:`refi_qda.parser`)
-is an implementation detail and may change without notice.
+Everything else (the leading-underscore helpers in :mod:`refi_qda.parser`
+and :mod:`refi_qda.writer`) is an implementation detail and may change
+without notice.
 """
 
 from __future__ import annotations
@@ -41,6 +45,7 @@ from refi_qda.container import (
 )
 from refi_qda.model import Project
 from refi_qda.parser import parse_qde, parse_qdpx
+from refi_qda.writer import to_qde, write_qdpx
 
 try:
     __version__ = _metadata.version("qdpx-toolkit")
@@ -61,4 +66,6 @@ __all__ = [
     "parse_qde",
     "parse_qdpx",
     "resolve_external_sources",
+    "to_qde",
+    "write_qdpx",
 ]
