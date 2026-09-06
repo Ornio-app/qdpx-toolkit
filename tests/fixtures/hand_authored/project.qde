@@ -74,9 +74,6 @@
     </PictureSource>
     <PDFSource guid="40000000-0000-0000-0000-000000000003" name="doc.pdf"
                path="internal://33333333-3333-3333-3333-333333333333.pdf">
-      <Representation guid="70000000-0000-0000-0000-000000000001">
-        <PlainTextContent>Notes about diet and health from the document.</PlainTextContent>
-      </Representation>
       <PDFSelection guid="50000000-0000-0000-0000-000000000004" name="diet and health"
                     page="0" firstX="18" firstY="45" secondX="577" secondY="234">
         <Representation guid="70000000-0000-0000-0000-000000000002">
@@ -86,6 +83,9 @@
           <CodeRef targetGUID="20000000-0000-0000-0000-000000000002"/>
         </Coding>
       </PDFSelection>
+      <Representation guid="70000000-0000-0000-0000-000000000001">
+        <PlainTextContent>Notes about diet and health from the document.</PlainTextContent>
+      </Representation>
     </PDFSource>
     <AudioSource guid="40000000-0000-0000-0000-000000000004" name="interview.m4a"
                  path="relative:///Audio/interview.m4a">

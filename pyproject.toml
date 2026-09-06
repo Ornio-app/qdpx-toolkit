@@ -48,6 +48,13 @@ dev = [
     "mypy>=1.11",
     "lxml-stubs>=0.5",
 ]
+# Only needed to run scripts/fetch_schema.py, which recovers the REFI-QDA
+# XSDs from the published spec PDF -- see that script's docstring. Kept out
+# of `dev` deliberately: CI does not run that script, and the runtime
+# library has no PDF-parsing needs whatsoever.
+scripts = [
+    "pypdf>=4.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/refi_qda"]
