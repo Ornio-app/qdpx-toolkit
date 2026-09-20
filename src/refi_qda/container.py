@@ -1,13 +1,24 @@
 """Reading the ``.qdpx`` ZIP container (REFI-QDA section 8).
 
-A ``.qdpx`` file is a ZIP archive containing exactly one ``project.qde``
-XML file at its root and, optionally, a flat ``sources/`` folder holding
+A ``.qdpx`` file is a ZIP archive containing exactly one ``.qde`` XML
+file at its root and, optionally, a flat ``sources/`` folder holding
 "internal" source files named by GUID. This module deals only with that
-container-level structure -- opening the archive, finding ``project.qde``,
+container-level structure -- opening the archive, finding the ``.qde``,
 listing/reading internal sources, and resolving the ``internal://`` /
 ``relative://`` / ``absolute://`` source path scheme (section 8.3) -- and
-knows nothing about the XML inside ``project.qde``; see
-:mod:`refi_qda.parser` for that.
+knows nothing about the XML inside it; see :mod:`refi_qda.parser` for that.
+
+**On the ``.qde`` filename.** REFI-QDA v1.5 p.21 and section 8.1 require
+that file to be named exactly ``project.qde``. Real ATLAS.ti exports are
+not -- they name it after the project (``Trial.qde``), unpredictably, so
+the name cannot be derived from the archive either. This reader accepts
+any single root-level ``.qde`` and emits a
+:class:`refi_qda.exceptions.ContainerNamingWarning` when the name deviates,
+rather than either refusing real data or normalising the deviation in
+silence. What is *not* relaxed is "exactly one": zero or several ``.qde``
+files at the root are still a hard :class:`ContainerError`, because at that
+point there is no unambiguous project file to read. See
+``conformance/fixtures/atlasti/README.md`` for the full decision.
 
 External sources are treated as a first-class concern here, not an
 afterthought: an absolute path recorded by the exporting machine is one of
@@ -20,19 +31,25 @@ the user, as REFI-QDA section 8.3 recommends, or otherwise).
 
 from __future__ import annotations
 
+import warnings
 import zipfile
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
-from refi_qda.exceptions import ContainerError, ExternalSourceError
+from refi_qda.exceptions import (
+    ContainerError,
+    ContainerNamingWarning,
+    ExternalSourceError,
+)
 
 if TYPE_CHECKING:
     from refi_qda.model import Guid, Project
 
 __all__ = [
     "QDE_FILENAME",
+    "QDE_SUFFIX",
     "SOURCES_DIRNAME",
     "ExternalSourceResolution",
     "ParsedSourcePath",
@@ -42,7 +59,12 @@ __all__ = [
     "resolve_external_sources",
 ]
 
+#: The name REFI-QDA v1.5 p.21/section 8.1 requires for the project XML
+#: inside a ``.qdpx``. Still what :func:`refi_qda.writer.write_qdpx`
+#: emits; no longer what this reader insists on finding -- see the module
+#: docstring.
 QDE_FILENAME = "project.qde"
+QDE_SUFFIX = ".qde"
 SOURCES_DIRNAME = "sources"
 
 
@@ -182,7 +204,23 @@ class QdpxContainer:
         self._zip = zip_file
         self._path = path
         self._sources_prefix = f"{SOURCES_DIRNAME}/"
+        # Resolved exactly once, here, so that a non-conformant filename
+        # warns a single time per archive rather than on every read_qde().
+        self._qde_member = self._resolve_qde_member()
         self._validate_structure()
+
+    @property
+    def qde_filename(self) -> str:
+        """The name of the ``.qde`` member this container is actually reading.
+
+        Normally ``project.qde``. When it is anything else, the archive
+        deviates from REFI-QDA section 8.1 and a
+        :class:`refi_qda.exceptions.ContainerNamingWarning` was emitted when
+        this container was opened. Exposed so a caller can report or record
+        *which* file it used, rather than only being told that something was
+        off.
+        """
+        return self._qde_member
 
     @classmethod
     def open(cls, path: str | Path) -> QdpxContainer:
@@ -190,8 +228,11 @@ class QdpxContainer:
 
         Raises :class:`refi_qda.exceptions.ContainerError` if it is not a
         readable ZIP file, or if its internal structure violates REFI-QDA
-        section 8.1 (missing ``project.qde``, or a non-flat ``sources/``
-        folder).
+        section 8.1 (no ``.qde`` at the root, more than one, or a non-flat
+        ``sources/`` folder).
+
+        Emits :class:`refi_qda.exceptions.ContainerNamingWarning` if the
+        single ``.qde`` found is not named ``project.qde``.
         """
         path = Path(path)
         try:
@@ -209,13 +250,48 @@ class QdpxContainer:
     def close(self) -> None:
         self._zip.close()
 
+    def _resolve_qde_member(self) -> str:
+        """Find the single root-level ``.qde`` member, warning if misnamed.
+
+        Relaxes *what the file is called*, not *how many there are*: zero
+        or several candidates are still a :class:`ContainerError`, because
+        neither leaves an unambiguous project file to read.
+        """
+        candidates = [
+            name
+            for name in self._zip.namelist()
+            if "/" not in name and name.lower().endswith(QDE_SUFFIX)
+        ]
+
+        if not candidates:
+            raise ContainerError(
+                f"{self._label()} contains no {QDE_SUFFIX!r} file at its root "
+                f"(REFI-QDA section 8.1 requires exactly one, named {QDE_FILENAME!r})."
+            )
+        if len(candidates) > 1:
+            listed = ", ".join(repr(name) for name in sorted(candidates))
+            raise ContainerError(
+                f"{self._label()} contains {len(candidates)} {QDE_SUFFIX!r} files at its "
+                f"root ({listed}); REFI-QDA section 8.1 requires exactly one, so there is "
+                "no unambiguous project file to read."
+            )
+
+        member = candidates[0]
+        if member != QDE_FILENAME:
+            warnings.warn(
+                ContainerNamingWarning(
+                    f"{self._label()} contains its project XML as {member!r}, not "
+                    f"{QDE_FILENAME!r} as REFI-QDA v1.5 p.21/section 8.1 require. "
+                    "Reading it anyway. Writing this project back out with "
+                    "refi_qda.writer.write_qdpx will produce a conformant "
+                    f"{QDE_FILENAME!r}."
+                ),
+                stacklevel=4,
+            )
+        return member
+
     def _validate_structure(self) -> None:
         names = self._zip.namelist()
-        if QDE_FILENAME not in names:
-            raise ContainerError(
-                f"{self._label()} does not contain a {QDE_FILENAME!r} file at its root "
-                "(REFI-QDA section 8.1 requires exactly one)."
-            )
         for name in names:
             if not name.startswith(self._sources_prefix):
                 continue
@@ -233,8 +309,13 @@ class QdpxContainer:
         return str(self._path) if self._path is not None else "this .qdpx archive"
 
     def read_qde(self) -> bytes:
-        """Read the raw bytes of ``project.qde``."""
-        return self._zip.read(QDE_FILENAME)
+        """Read the raw bytes of this archive's project XML.
+
+        Reads whichever root-level ``.qde`` member was resolved when the
+        container was opened -- see :attr:`qde_filename` -- which is not
+        necessarily ``project.qde``.
+        """
+        return self._zip.read(self._qde_member)
 
     def list_internal_sources(self) -> list[str]:
         """List filenames (not full paths) present under ``sources/``."""

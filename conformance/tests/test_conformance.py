@@ -16,14 +16,11 @@ Auto-discovers whatever `.qdpx` fixtures exist under
 
 from __future__ import annotations
 
-import zipfile
 from pathlib import Path
 
 import pytest
 
 from conformance.diffing import diff_projects
-from refi_qda.container import QDE_FILENAME
-from refi_qda.exceptions import ContainerError
 from refi_qda.parser import parse_qdpx
 
 CONFORMANCE_DIR = Path(__file__).resolve().parent.parent
@@ -44,24 +41,6 @@ def _discover(directory: Path) -> list[Path]:
     return sorted(p for p in directory.glob("*.qdpx") if p.is_file())
 
 
-def _lacks_conformant_qde_name(qdpx_path: Path) -> bool:
-    """True if the archive holds no ``project.qde`` at its root.
-
-    REFI-QDA v1.5 p.21 and §8.1 require that exact name, but real ATLAS.ti
-    exports name the file after the project instead (see
-    ``conformance/fixtures/atlasti/README.md``). Detected here by
-    inspecting the archive rather than by hardcoding filenames, so any
-    vendor export with this defect is handled the same way.
-    """
-    try:
-        with zipfile.ZipFile(qdpx_path) as archive:
-            return QDE_FILENAME not in archive.namelist()
-    except (OSError, zipfile.BadZipFile):
-        # Not a readable ZIP at all -- a different finding. Let the test
-        # run and fail loudly rather than masking it as a known xfail.
-        return False
-
-
 def _params(directory: Path, label: str) -> list[object]:
     """Build parametrize params, or a single skipped placeholder if none found."""
     found = _discover(directory)
@@ -76,30 +55,7 @@ def _params(directory: Path, label: str) -> list[object]:
                 ),
             )
         ]
-    params: list[object] = []
-    for path in found:
-        # A known vendor container defect should read as a documented
-        # xfail here, not as a suite failure that buries every other
-        # finding. Deliberately non-strict: when no seed project exists
-        # this test skips before it can XPASS, so strictness would be
-        # unreliable. The authoritative, strict pin for this defect lives
-        # in test_atlasti_container_naming.py.
-        marks = (
-            [
-                pytest.mark.xfail(
-                    raises=ContainerError,
-                    reason=(
-                        f"{path.name} has no {QDE_FILENAME!r} at its root, so parse_qdpx "
-                        "rejects it. Known vendor non-conformance -- see "
-                        "conformance/fixtures/atlasti/README.md 'Open design question'."
-                    ),
-                )
-            ]
-            if _lacks_conformant_qde_name(path)
-            else []
-        )
-        params.append(pytest.param(path, id=path.name, marks=marks))
-    return params
+    return [pytest.param(p, id=p.name) for p in found]
 
 
 # --------------------------------------------------------------------------

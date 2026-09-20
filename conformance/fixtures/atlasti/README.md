@@ -35,9 +35,10 @@ The minimum viable export: one video source, one uncoded selection
 What it pins:
 
 - **Container filename non-conformance.** The archive contains `Trial.qde`,
-  not `project.qde`. This is the one thing that stops `parse_qdpx` from
-  opening either fixture -- see `../../tests/test_atlasti_container_naming.py`
-  and the open design question below.
+  not `project.qde`. This used to stop `parse_qdpx` from opening either
+  fixture; as of the accept-and-warn decision below it opens and emits a
+  `ContainerNamingWarning` instead -- see
+  `../../tests/test_atlasti_container_naming.py`.
 - **Schema conformance.** Despite the filename, the payload validates
   cleanly against the REFI-QDA Project v1.0 XSD. Useful as a control: it
   establishes that the container check, not the XML, is what fails.
@@ -101,11 +102,11 @@ Closing these needs a project with a 3+ level code hierarchy, two genuinely
 overlapping selections on one source, and at least one text document --
 i.e. the seed project described in `../seed/README.md`.
 
-## Open design question: should the reader require `project.qde`?
+## Resolved: the reader accepts any single `.qde`, and warns
 
-**Do not "fix" the container check without settling this first.** The test
-that pins it is marked `xfail(strict=True)` precisely so that making it
-pass fails the suite and forces this conversation.
+**Decision taken. Option 3, accept-and-warn.** Recorded here rather than
+only in a commit message, because the reasoning matters more than the
+change.
 
 The spec is unambiguous. REFI-QDA v1.5 p.21:
 
@@ -117,43 +118,74 @@ and §8.1:
 > "a compressed (zipped) folder structure containing a single
 > **'project.qde'** file"
 
-So `refi_qda.container` is correct as written, and ATLAS.ti 26 is
-non-conformant. The question is what a *reference implementation* should do
-about a vendor that a large fraction of real users depend on.
+So `refi_qda.container` was correct as written, and ATLAS.ti 26 is
+non-conformant. The question was what a *reference implementation* should
+do about a vendor that a large share of real users depend on.
 
-The naming is also unpredictable, which rules out the obvious workaround:
+The naming is also unpredictable, which ruled out the obvious workaround:
 fixture 02 was exported to a file called `Project.qdpx` and still contains
 `Trial.qde`. ATLAS.ti names the inner file after the **project name inside
 ATLAS.ti**, not after the export filename, so a reader cannot derive the
 expected name from the archive name.
 
-Options, none yet chosen:
+### What the reader does now
 
-1. **Keep requiring `project.qde`.** Spec-pure; cannot open real ATLAS.ti
-   exports; arguably useless as a practical tool.
-2. **Accept any single `*.qde` at the archive root**, and require exactly
-   one so the choice is never ambiguous. Pragmatic, and the failure mode
-   (two `.qde` files) is still a hard error rather than a guess.
-3. **Accept it but report it.** Parse, and surface the deviation through a
-   structured warning or a field on the returned `Project`, so a caller can
-   tell a conformant file from a tolerated one. Most informative; most API
-   surface.
-4. **Strict/lenient modes.** A `strict=True` default with an opt-out. Puts
-   the choice on the caller, at the cost of two code paths to maintain.
+- Accepts **any single root-level `.qde`**, whatever it is called.
+- Emits `refi_qda.exceptions.ContainerNamingWarning` when that name is not
+  `project.qde`, naming the file it found and citing §8.1.
+- Exposes `QdpxContainer.qde_filename` so a caller can record *which* file
+  was used, not merely be told something was off.
+- Still raises `ContainerError` for **zero** or **more than one** `.qde` at
+  the root. Only the naming requirement was relaxed, not "exactly one" --
+  with two project files there is no unambiguous answer, and guessing
+  would be worse than failing.
 
-One implementation note, found by actually trying it: the name is
-hardcoded in **two** places in `refi_qda.container`, not one --
-`QdpxContainer._validate_structure` rejects the archive, and
-`QdpxContainer.read_qde` then reads `QDE_FILENAME` by name. Relaxing only
-the first turns a clean `ContainerError` into a raw `KeyError` from
-`zipfile`, which is strictly worse than the current behaviour. Whoever
-takes this on should change both together.
+### Why a warning rather than a log line
 
-Whichever is chosen, the deviation should stay *visible* rather than being
-silently normalised -- documenting exactly this kind of divergence is the
-point of the project (see `README.md`, "Why this exists"). Note that
-`refi_qda.writer.write_qdpx` already emits a correctly named `project.qde`,
-so the toolkit can already act as a normaliser for this defect.
+`warnings.warn` lets the *caller* decide how strict to be, which logging
+cannot:
+
+```python
+import warnings
+from refi_qda.exceptions import ContainerNamingWarning
+
+warnings.simplefilter("error", ContainerNamingWarning)  # now a hard error
+```
+
+A conformance-checking consumer escalates it; a researcher trying to read
+their own data gets a message and their project. This library is also a
+library, not an application, so it has no business configuring logging
+handlers. There was no existing warning or logging convention anywhere in
+the codebase, so `QdpxWarning` was added to `refi_qda.exceptions`,
+mirroring the existing `QdpxError` hierarchy.
+
+### The deviation stays visible
+
+Documenting divergence rather than papering over it is the point of this
+project (see `README.md`, "Why this exists"). Accept-and-warn keeps the
+deviation observable in three ways at once: the warning, the
+`qde_filename` accessor, and these fixtures.
+
+`refi_qda.writer.write_qdpx` deliberately still emits a conformant
+`project.qde`, so **the toolkit repairs this defect**: read a
+non-conformant ATLAS.ti export, write it back out, and the result opens
+silently anywhere. That round trip is pinned by
+`test_reading_then_writing_repairs_the_filename`.
+
+### If you are tempted to change this again
+
+The tests guard both directions. `test_atlasti_export_now_opens_and_warns`
+fails if the fixtures stop opening *or* if the warning disappears (it
+matches the warning's content, not just its presence);
+`test_conformant_archive_emits_no_warning` fails if correct files start
+warning. Both were verified to fail when deliberately broken.
+
+One implementation note, found by trying it the wrong way first: the name
+was hardcoded in **two** places -- `_validate_structure` and `read_qde`.
+Relaxing only the first turned a clean `ContainerError` into a raw
+`KeyError` from `zipfile`. Both now route through a single
+`_resolve_qde_member`, called once at open time so the warning fires once
+per archive rather than once per read.
 
 ## What to drop here in future
 
@@ -187,9 +219,8 @@ this directory and:
 
 1. Parses it with `refi_qda.parser.parse_qdpx` (fails loudly if ATLAS.ti's
    export doesn't parse at all -- that is itself a conformance finding).
-   Fixtures whose archive has no `project.qde` are auto-detected at
-   collection time and marked `xfail`, so this known vendor defect does not
-   masquerade as a suite failure.
+   A non-conformant `.qde` filename no longer blocks this; it surfaces as a
+   `ContainerNamingWarning` in the test output instead.
 2. If `conformance/fixtures/seed/seed.qdpx` is also present, runs
    `conformance.diffing.diff_projects` against it and writes a structured
    report of exactly what survived, what changed, and what was lost.
