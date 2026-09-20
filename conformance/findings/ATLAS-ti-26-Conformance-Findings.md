@@ -106,7 +106,13 @@ archive. The two `.mov` files on disk are byte-identical copies.
 
 ### 1. A standards-conformant reader cannot open either export
 
-**Severity: blocking.** Both fixtures.
+**Severity: blocking. Resolved in this toolkit — see [Resolution](#resolution-accept-and-warn).**
+Both fixtures.
+
+> **Status:** this reader now opens both files and reports the deviation
+> rather than refusing them. The finding itself stands: ATLAS.ti 26 is
+> non-conformant, and any tool built strictly to the written standard
+> still rejects these exports.
 
 ```
 ContainerError: Project.qdpx does not contain a 'project.qde' file at its
@@ -138,6 +144,10 @@ ingesting deposits, a university repository, an independent analysis
 script — rejects real ATLAS.ti exports on contact. The failure is at least
 clear and immediate rather than silent, which is the one merciful thing
 about it.
+
+This toolkit no longer refuses them; see
+[Resolution](#resolution-accept-and-warn) below for what it does instead
+and why.
 
 ---
 
@@ -341,39 +351,43 @@ report should not be read as a substitute for it.
 
 ---
 
-## Open design question
+## Resolution: accept and warn
 
-**Finding 1 is deliberately left unfixed**, and the test that documents it
-is marked `xfail(strict=True)` so that making it pass fails the suite. The
-one-line change is obvious; whether it is right is not.
+**Finding 1 is now resolved in this toolkit.** Findings 2–6 are vendor-side
+and cannot be resolved here; they are reported, not repaired.
 
-The reader is correct as written — the standard is unambiguous, and
-ATLAS.ti 26 is non-conformant. The question is what a *reference
-implementation* owes its users when a vendor that a large share of
-researchers depend on diverges from the text.
+The reader was changed to **accept any single `.qde` file at the archive
+root, whatever it is named, and emit a structured warning when that name
+deviates from the standard**:
 
-Four options, none yet chosen:
+```
+ContainerNamingWarning: ...atlasti_26_handbuilt_02_codes_memos.qdpx contains
+its project XML as 'Trial.qde', not 'project.qde' as REFI-QDA v1.5
+p.21/section 8.1 require. Reading it anyway.
+```
 
-1. **Keep requiring `project.qde`.** Specification-pure; cannot open real
-   ATLAS.ti exports; arguably useless as a practical tool.
-2. **Accept any single `*.qde` at the archive root**, erroring if there is
-   more than one so the choice is never a guess.
-3. **Accept it, but report it** — surface the deviation through a
-   structured warning so callers can distinguish a conformant file from a
-   tolerated one. Most informative; largest API surface.
-4. **Strict and lenient modes**, with strict as the default.
+Three properties of that choice are worth stating, because the alternative
+readings are all defensible and one was nearly taken instead:
 
-The project's stated purpose is to document divergence rather than paper
-over it, so whichever is chosen, the deviation should stay visible rather
-than being silently normalised. Worth noting that
-`refi_qda.writer.write_qdpx` already emits a correctly named
-`project.qde`, so the toolkit can already act as a repair tool for this
-defect.
+- **The deviation stays visible.** Silently normalising it would have made
+  this toolkit complicit in the interoperability problem it exists to
+  document. The warning is also *escalatable* — a conformance-checking
+  caller can turn it into a hard error with one line of standard-library
+  `warnings` configuration, which a log message could not offer.
+- **"Exactly one project file" was not relaxed.** Zero or several `.qde`
+  files at the root remain a hard error. Only the *name* was relaxed;
+  guessing between two candidate project files would be worse than
+  failing.
+- **Writing is unchanged.** Exports produced by this toolkit are still
+  named `project.qde`. That makes it a **repair tool**: read a
+  non-conformant ATLAS.ti export, write it back out, and the result is
+  spec-correct and opens silently anywhere. This round trip is covered by
+  a test.
 
-Full discussion, including an implementation note for whoever takes it on,
-is in [`conformance/fixtures/atlasti/README.md`](../fixtures/atlasti/README.md).
-
----
+The three rejected alternatives — staying strict, accepting silently, or
+offering strict/lenient modes — are recorded with their reasoning in
+[`conformance/fixtures/atlasti/README.md`](../fixtures/atlasti/README.md),
+along with an implementation note for anyone revisiting it.
 
 ## Reproducing this
 
@@ -382,10 +396,10 @@ uv run --with pypdf scripts/fetch_schema.py   # recover the XSD
 python -m pytest conformance/tests/test_atlasti_container_naming.py -v
 ```
 
-Expected: the two `test_public_api_cannot_open_atlasti_export` cases
-report `XFAIL`; everything else passes. An `XPASS` means the container
-check was changed — see the open design question above before assuming
-that is an improvement.
+Expected: everything passes, with `ContainerNamingWarning` surfacing in
+the output for both ATLAS.ti fixtures. The tests guard the resolution in
+both directions — they fail if the fixtures stop opening, and equally if
+the warning is dropped and silent acceptance is left behind.
 
 ---
 

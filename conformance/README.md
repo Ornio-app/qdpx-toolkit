@@ -25,14 +25,15 @@ Hand-written reports live in `findings/` and are committed. Machine-generated
 diff reports go to `conformance/reports/`, which is gitignored and
 regenerated on every run -- don't confuse the two.
 
-**Note on the ATLAS.ti fixtures:** neither can be opened by
-`refi_qda.parser.parse_qdpx` at all, because ATLAS.ti names the XML inside
-the archive after the project instead of `project.qde` as REFI-QDA v1.5
-p.21/§8.1 require. That defect is pinned by an `xfail(strict=True)` test in
-`tests/test_atlasti_container_naming.py`, so "fixing" it fails the suite on
-purpose: whether a reference implementation should tolerate this is an
-open design question, documented in
-`fixtures/atlasti/README.md`.
+**Note on the ATLAS.ti fixtures:** ATLAS.ti names the XML inside the
+archive after the project (`Trial.qde`) instead of `project.qde` as
+REFI-QDA v1.5 p.21/§8.1 require. Both fixtures therefore open with a
+`refi_qda.exceptions.ContainerNamingWarning` rather than silently or not
+at all -- the reader accepts any single root-level `.qde` and reports the
+deviation. Zero or several `.qde` files remain a hard `ContainerError`.
+The decision and its three rejected alternatives are recorded in
+`fixtures/atlasti/README.md`; the guards against regressing it in either
+direction are in `tests/test_atlasti_container_naming.py`.
 
 ## How it works
 

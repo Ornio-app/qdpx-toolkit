@@ -26,7 +26,11 @@ The public API is deliberately small:
 * :mod:`refi_qda.container` -- lower-level ``.qdpx`` ZIP access, including
   explicit external-source resolution (:func:`refi_qda.container.resolve_external_sources`).
 * :mod:`refi_qda.exceptions` -- the exception hierarchy every deliberate
-  error in this package subclasses.
+  error in this package subclasses, and the :class:`QdpxWarning` hierarchy
+  every deliberate warning subclasses. Notably
+  :class:`ContainerNamingWarning`, emitted when a ``.qdpx`` names its
+  project XML something other than ``project.qde`` (as real ATLAS.ti
+  exports do); filter or escalate it with :mod:`warnings` as you prefer.
 
 Everything else (the leading-underscore helpers in :mod:`refi_qda.parser`
 and :mod:`refi_qda.writer`) is an implementation detail and may change
@@ -43,6 +47,7 @@ from refi_qda.container import (
     SourceScheme,
     resolve_external_sources,
 )
+from refi_qda.exceptions import ContainerNamingWarning, QdpxWarning
 from refi_qda.model import Project
 from refi_qda.parser import parse_qde, parse_qdpx
 from refi_qda.writer import to_qde, write_qdpx
@@ -57,9 +62,11 @@ except _metadata.PackageNotFoundError:  # pragma: no cover - editable/unbuilt ch
 open_qdpx = parse_qdpx
 
 __all__ = [
+    "ContainerNamingWarning",
     "ExternalSourceResolution",
     "Project",
     "QdpxContainer",
+    "QdpxWarning",
     "SourceScheme",
     "__version__",
     "open_qdpx",

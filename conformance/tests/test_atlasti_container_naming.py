@@ -1,24 +1,32 @@
 """Pins the ATLAS.ti 26 findings documented in ``../fixtures/atlasti/README.md``.
 
-This module exists so that two things cannot happen quietly:
+**Container filename: resolved, option 3 (accept-and-warn).** ATLAS.ti 26
+names the XML inside a ``.qdpx`` after the *project* rather than
+``project.qde``, which REFI-QDA v1.5 p.21 and section 8.1 require. This
+reader now accepts any single root-level ``.qde`` and emits a
+:class:`refi_qda.exceptions.ContainerNamingWarning` naming the deviation,
+rather than refusing real data or normalising it in silence.
 
-1. **The container-filename defect cannot be "fixed" without a decision.**
-   ATLAS.ti 26 names the XML inside a ``.qdpx`` after the *project* rather
-   than ``project.qde``, which REFI-QDA v1.5 p.21 and §8.1 require. That
-   stops :func:`refi_qda.parser.parse_qdpx` from opening a real ATLAS.ti
-   export at all. :func:`test_public_api_cannot_open_atlasti_export` is
-   marked ``xfail(strict=True)``, so relaxing the container check turns
-   this test into an ``XPASS`` *failure* rather than a silent green tick.
-   That is deliberate: see "Open design question" in the fixtures README.
-   There are at least four reasonable ways to resolve it and this suite
-   should not pick one by accident.
+These tests guard that decision from regressing in *either* direction:
 
-2. **The findings cannot regress silently.** The remaining tests are
-   characterisation tests -- they assert what ATLAS.ti *actually* does
-   today (memos flattened to ``<Description>``, GUIDs reassigned on every
-   export, a zero-length selection), not what it ought to do. If a later
-   ATLAS.ti build changes any of this, these fail and the README needs
-   updating. A failure here is a finding, not necessarily a bug.
+* back to refusing -- :func:`test_atlasti_export_now_opens` fails if the
+  fixtures stop opening;
+* forward into silent acceptance -- the same test uses ``pytest.warns``
+  and matches the warning's *content*, so deleting the warning fails the
+  suite just as loudly as deleting the support would;
+* into over-warning -- :func:`test_conformant_archive_emits_no_warning`
+  fails if a correctly named ``project.qde`` starts warning too.
+
+What was deliberately *not* relaxed is "exactly one project file":
+:func:`test_no_qde_still_raises` and :func:`test_multiple_qde_still_raises`
+pin that zero or several ``.qde`` files remain a hard ``ContainerError``.
+
+The remaining tests are characterisation tests -- they assert what
+ATLAS.ti *actually* does today (memos flattened to ``<Description>``,
+GUIDs reassigned on every export, a zero-length selection), not what it
+ought to do. If a later ATLAS.ti build changes any of this, these fail and
+the README needs updating. A failure here is a finding, not necessarily a
+bug.
 
 Nothing in this module tests the three risk areas named in SPEC.md §1.3
 (overlapping selections, nested codes, character offsets). Neither fixture
@@ -28,23 +36,24 @@ exercises them -- see the fixtures README's "Known gaps" section.
 from __future__ import annotations
 
 import os
+import warnings
 import zipfile
 from pathlib import Path
 
 import pytest
 
-from refi_qda.container import QDE_FILENAME
-from refi_qda.exceptions import ContainerError
+from refi_qda.container import QDE_FILENAME, QdpxContainer
+from refi_qda.exceptions import ContainerError, ContainerNamingWarning
 from refi_qda.model import VideoSelection, VideoSource
 from refi_qda.parser import parse_qde, parse_qdpx
+from refi_qda.writer import to_qde, write_qdpx
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "atlasti"
 
 BASELINE = FIXTURES_DIR / "atlasti_26_handbuilt_01_baseline.qdpx"
 CODES_MEMOS = FIXTURES_DIR / "atlasti_26_handbuilt_02_codes_memos.qdpx"
 
-#: The name REFI-QDA requires, and the name ATLAS.ti 26 actually writes.
-EXPECTED_QDE_NAME = QDE_FILENAME
+#: What ATLAS.ti 26 actually names the file, in both fixtures.
 ACTUAL_QDE_NAME = "Trial.qde"
 
 _ALL_FIXTURES = [BASELINE, CODES_MEMOS]
@@ -61,10 +70,10 @@ pytestmark = pytest.mark.skipif(
 def _read_qde_bypassing_container(qdpx_path: Path) -> bytes:
     """Read the one ``*.qde`` member directly, ignoring what it is named.
 
-    Deliberately does *not* go through :class:`refi_qda.container.QdpxContainer`:
-    the whole point of these fixtures is that the container layer rejects
-    them, and we still need to get at the payload to show the payload is
-    fine.
+    Used by the payload-level characterisation tests below, which are about
+    what ATLAS.ti put *in* the XML and have nothing to say about the
+    container. Going direct keeps them independent of container behaviour
+    and free of the naming warning.
     """
     with zipfile.ZipFile(qdpx_path) as archive:
         members = [n for n in archive.namelist() if n.lower().endswith(".qde")]
@@ -72,53 +81,153 @@ def _read_qde_bypassing_container(qdpx_path: Path) -> bytes:
         return archive.read(members[0])
 
 
+def _qdpx_containing(tmp_path: Path, name: str, *members: str) -> Path:
+    """Build a throwaway ``.qdpx`` holding exactly the named members."""
+    dest = tmp_path / name
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
+        for member in members:
+            zf.writestr(member, "<Project/>")
+    return dest
+
+
 # --------------------------------------------------------------------------
-# 1. The defect itself.
+# 1. The resolved behaviour: accept, but say so.
 # --------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("qdpx_path", _ALL_FIXTURES, ids=lambda p: p.name)
-@pytest.mark.xfail(
-    strict=True,
-    raises=ContainerError,
-    reason=(
-        "ATLAS.ti 26 names the archive's XML after the project (e.g. 'Trial.qde'), "
-        "not 'project.qde' as REFI-QDA v1.5 p.21/§8.1 require, so parse_qdpx cannot "
-        "open a real ATLAS.ti export. strict=True is intentional: if you relax the "
-        "container check this test XPASSes and the suite FAILS, because whether to "
-        "accept any single *.qde is an open design question, not a settled bug. "
-        "Read 'Open design question' in conformance/fixtures/atlasti/README.md first."
-    ),
-)
-def test_public_api_cannot_open_atlasti_export(qdpx_path: Path) -> None:
-    parse_qdpx(qdpx_path)
+def test_atlasti_export_now_opens_and_warns(qdpx_path: Path) -> None:
+    """Both fixtures open, and the deviation is reported rather than swallowed.
 
-
-def test_inner_qde_is_named_after_the_project_not_the_archive() -> None:
-    """The workaround of guessing the name from the archive is not available.
-
-    ``atlasti_26_handbuilt_02_codes_memos.qdpx`` was exported from ATLAS.ti
-    to a file the user named ``Project.qdpx`` and *still* contains
-    ``Trial.qde`` -- the inner name tracks the ATLAS.ti project name, which
-    a reader has no way to know in advance.
+    ``pytest.warns`` fails the test if *no* warning is emitted, so this is
+    also the regression guard against someone quietly dropping the warning
+    and leaving silent acceptance behind.
     """
-    for qdpx_path in _ALL_FIXTURES:
-        with zipfile.ZipFile(qdpx_path) as archive:
-            assert archive.namelist() == [ACTUAL_QDE_NAME], (
-                f"{qdpx_path.name} no longer contains exactly [{ACTUAL_QDE_NAME!r}] -- "
-                "if ATLAS.ti changed its naming, update the fixtures README."
-            )
-            assert EXPECTED_QDE_NAME not in archive.namelist()
+    with pytest.warns(ContainerNamingWarning) as recorded:
+        project = parse_qdpx(qdpx_path)
+
+    # It actually parsed.
+    assert project.name == "Trial"
+    assert len(project.sources) == 1
+
+    # And the warning says something useful: which file, and why it matters.
+    assert len(recorded) == 1, "the naming deviation should be reported exactly once"
+    message = str(recorded[0].message)
+    assert ACTUAL_QDE_NAME in message, "the warning must name the file it actually found"
+    assert QDE_FILENAME in message, "the warning must name what the spec expected"
+    assert "8.1" in message, "the warning must cite the clause being deviated from"
+
+
+@pytest.mark.parametrize("qdpx_path", _ALL_FIXTURES, ids=lambda p: p.name)
+def test_container_reports_which_qde_it_used(qdpx_path: Path) -> None:
+    """The deviation is inspectable, not only announced."""
+    with pytest.warns(ContainerNamingWarning), QdpxContainer.open(qdpx_path) as container:
+        assert container.qde_filename == ACTUAL_QDE_NAME
+        assert container.read_qde().startswith(b"<?xml")
+
+
+@pytest.mark.parametrize("qdpx_path", _ALL_FIXTURES, ids=lambda p: p.name)
+def test_warning_is_emitted_once_per_archive_not_once_per_read(qdpx_path: Path) -> None:
+    """Resolution happens at open time, so repeated reads stay quiet."""
+    with pytest.warns(ContainerNamingWarning) as recorded, QdpxContainer.open(qdpx_path) as c:
+        c.read_qde()
+        c.read_qde()
+        c.read_qde()
+    assert len(recorded) == 1
+
+
+def test_conformant_archive_emits_no_warning(tmp_path: Path) -> None:
+    """Guards the opposite regression: don't warn about correct files."""
+    conformant = _qdpx_containing(tmp_path, "conformant.qdpx", QDE_FILENAME)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ContainerNamingWarning)
+        with QdpxContainer.open(conformant) as container:
+            assert container.qde_filename == QDE_FILENAME
+
+
+def test_warning_can_be_escalated_to_an_error(tmp_path: Path) -> None:
+    """A conformance-checking caller can still demand strictness.
+
+    This is the reason the deviation is a ``warnings`` warning rather than
+    a log line: the caller, not this library, decides how strict to be.
+    """
+    deviant = _qdpx_containing(tmp_path, "deviant.qdpx", "Trial.qde")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ContainerNamingWarning)
+        with pytest.raises(ContainerNamingWarning):
+            QdpxContainer.open(deviant)
 
 
 # --------------------------------------------------------------------------
-# 2. The payload is fine. Only the container check fails.
+# 2. What was NOT relaxed: exactly one project file.
+# --------------------------------------------------------------------------
+
+
+def test_no_qde_still_raises(tmp_path: Path) -> None:
+    archive = _qdpx_containing(tmp_path, "empty.qdpx", "readme.txt")
+    with pytest.raises(ContainerError, match=r"no '\.qde' file at its root"):
+        QdpxContainer.open(archive)
+
+
+def test_multiple_qde_still_raises(tmp_path: Path) -> None:
+    archive = _qdpx_containing(tmp_path, "ambiguous.qdpx", "Trial.qde", "Other.qde")
+    with pytest.raises(ContainerError, match="no unambiguous project file"):
+        QdpxContainer.open(archive)
+
+
+def test_multiple_qde_raises_even_when_one_is_conformant(tmp_path: Path) -> None:
+    """Don't silently prefer ``project.qde`` -- two project files is still ambiguous."""
+    archive = _qdpx_containing(tmp_path, "both.qdpx", QDE_FILENAME, "Trial.qde")
+    with pytest.raises(ContainerError, match="no unambiguous project file"):
+        QdpxContainer.open(archive)
+
+
+def test_qde_in_a_subfolder_does_not_count(tmp_path: Path) -> None:
+    """Only root-level members are candidates, per section 8.1."""
+    archive = _qdpx_containing(tmp_path, "nested.qdpx", "nested/Trial.qde")
+    with pytest.raises(ContainerError, match=r"no '\.qde' file at its root"):
+        QdpxContainer.open(archive)
+
+
+# --------------------------------------------------------------------------
+# 3. The repair path: read non-conformant, write conformant.
 # --------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("qdpx_path", _ALL_FIXTURES, ids=lambda p: p.name)
-def test_payload_parses_once_the_container_check_is_bypassed(qdpx_path: Path) -> None:
-    """Establishes that the filename is the *only* thing wrong with these files."""
+def test_reading_then_writing_repairs_the_filename(qdpx_path: Path, tmp_path: Path) -> None:
+    """The most useful consequence of accept-and-warn: this toolkit fixes the defect.
+
+    Read a non-conformant ATLAS.ti export, write it back out, and the
+    result is a spec-correct ``project.qde`` that opens without any
+    warning -- with the project data unchanged.
+    """
+    with pytest.warns(ContainerNamingWarning):
+        original = parse_qdpx(qdpx_path)
+
+    repaired = tmp_path / "repaired.qdpx"
+    write_qdpx(original, repaired)
+
+    # The archive is now conformant...
+    with zipfile.ZipFile(repaired) as archive:
+        assert archive.namelist() == [QDE_FILENAME]
+
+    # ...it opens silently...
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ContainerNamingWarning)
+        reparsed = parse_qdpx(repaired)
+
+    # ...and nothing was lost on the way through.
+    assert reparsed == original
+
+
+# --------------------------------------------------------------------------
+# 4. The payload was always fine. Only the container name was wrong.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("qdpx_path", _ALL_FIXTURES, ids=lambda p: p.name)
+def test_payload_parses(qdpx_path: Path) -> None:
     project = parse_qde(_read_qde_bypassing_container(qdpx_path))
     assert project.name == "Trial"
     assert project.origin is not None and project.origin.startswith("ATLAS.ti 26.1.2")
@@ -151,14 +260,29 @@ def test_payload_is_schema_valid(qdpx_path: Path) -> None:
 @pytest.mark.parametrize("qdpx_path", _ALL_FIXTURES, ids=lambda p: p.name)
 def test_read_write_read_is_lossless(qdpx_path: Path) -> None:
     """Round-trip fidelity, per SPEC.md §1.2 step 4."""
-    from refi_qda.writer import to_qde
-
     original = parse_qde(_read_qde_bypassing_container(qdpx_path))
     assert parse_qde(to_qde(original)) == original
 
 
+def test_inner_qde_is_named_after_the_project_not_the_archive() -> None:
+    """Why the name could not simply be guessed instead of relaxed.
+
+    ``atlasti_26_handbuilt_02_codes_memos.qdpx`` was exported from ATLAS.ti
+    to a file the user named ``Project.qdpx`` and *still* contains
+    ``Trial.qde`` -- the inner name tracks the ATLAS.ti project name, which
+    a reader has no way to know in advance. Deriving the expected filename
+    from the archive filename was never an option.
+    """
+    for qdpx_path in _ALL_FIXTURES:
+        with zipfile.ZipFile(qdpx_path) as archive:
+            assert archive.namelist() == [ACTUAL_QDE_NAME], (
+                f"{qdpx_path.name} no longer contains exactly [{ACTUAL_QDE_NAME!r}] -- "
+                "if ATLAS.ti changed its naming, update the fixtures README."
+            )
+
+
 # --------------------------------------------------------------------------
-# 3. Characterisation of what ATLAS.ti 26 actually exports.
+# 5. Characterisation of what ATLAS.ti 26 actually exports.
 # --------------------------------------------------------------------------
 
 

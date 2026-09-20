@@ -1,10 +1,30 @@
-"""Exception hierarchy for :mod:`refi_qda`.
+"""Exception and warning hierarchy for :mod:`refi_qda`.
 
 Every error this library raises deliberately, on purpose, subclasses
 :class:`QdpxError`. Errors that come from underlying libraries (``zipfile``,
 ``lxml``) are wrapped rather than left to propagate raw, so callers can
 catch ``QdpxError`` and know they have covered everything this package can
 throw intentionally.
+
+Warnings get the same treatment, in the same module, for the same reason:
+every warning this library emits deliberately subclasses
+:class:`QdpxWarning`. They live here rather than in a separate module
+because :class:`Warning` is itself a subclass of :class:`Exception` -- this
+is one hierarchy of "things this library reports", not two.
+
+Warnings, not logging, are used for recoverable spec deviations. This is a
+library, not an application, so it has no business configuring logging
+handlers; and :mod:`warnings` gives the caller something logging cannot --
+the ability to escalate a deviation into a hard error::
+
+    import warnings
+    from refi_qda.exceptions import ContainerNamingWarning
+
+    warnings.simplefilter("error", ContainerNamingWarning)
+
+which is exactly what a conformance-checking caller wants, while a
+researcher just trying to read their data gets a message and their
+project.
 
 This library would rather raise :class:`UnsupportedFeatureError` than
 silently drop part of a project during parsing. If you see this exception,
@@ -18,9 +38,11 @@ from __future__ import annotations
 
 __all__ = [
     "ContainerError",
+    "ContainerNamingWarning",
     "ExternalSourceError",
     "ParseError",
     "QdpxError",
+    "QdpxWarning",
     "SchemaNotConfiguredError",
     "SchemaValidationError",
     "UnsupportedFeatureError",
@@ -29,6 +51,36 @@ __all__ = [
 
 class QdpxError(Exception):
     """Base class for all exceptions raised deliberately by ``refi_qda``."""
+
+
+class QdpxWarning(UserWarning):
+    """Base class for all warnings emitted deliberately by ``refi_qda``.
+
+    Subclasses :class:`UserWarning` rather than :class:`Warning` directly so
+    that Python's default filters actually show it: bare ``Warning`` and
+    ``DeprecationWarning`` are hidden by default in many contexts, and a
+    deviation nobody sees is no better than silence.
+    """
+
+
+class ContainerNamingWarning(QdpxWarning):
+    """A ``.qdpx`` archive's XML file is not named ``project.qde``.
+
+    REFI-QDA v1.5 p.21 and section 8.1 require the project XML inside the
+    archive to be named exactly ``project.qde``. Real exports from at least
+    one major tool are not: ATLAS.ti 26 names it after the project instead
+    (``Trial.qde``), and the name tracks the project rather than the
+    archive, so it cannot be predicted.
+
+    This library reads such an archive anyway -- refusing would make it
+    useless against a large share of real data -- but says so rather than
+    normalising the deviation silently. See
+    ``conformance/fixtures/atlasti/README.md`` for the full decision.
+
+    Note that :func:`refi_qda.writer.write_qdpx` always writes a
+    conformant ``project.qde``, so reading a non-conformant archive and
+    writing it back out repairs this defect.
+    """
 
 
 class ContainerError(QdpxError):
