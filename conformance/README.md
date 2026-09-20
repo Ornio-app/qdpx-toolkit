@@ -6,11 +6,33 @@ literally -- see "Deviation from SPEC.md §1.2" below.
 
 ## Status
 
-This is a scaffold. It is green today (everything skips cleanly) because
-no real vendor exports exist in this repository yet, and it becomes
-meaningful the moment `conformance/fixtures/seed/seed.qdpx` and at least
-one vendor export exist -- see each `conformance/fixtures/<tool>/README.md`
-for exactly what to drop where.
+Partly real. `conformance/fixtures/atlasti/` now holds two genuine
+ATLAS.ti 26 exports and the findings from them are written up in
+`findings/` (see below). The `seed`, `nvivo` and `maxqda` directories are
+still empty, so those tests still skip -- see each
+`conformance/fixtures/<tool>/README.md` for exactly what to drop where.
+
+Because no seed project exists yet, the ATLAS.ti fixtures are parsed and
+characterised rather than structurally diffed against a baseline.
+
+## Published findings
+
+| Report | Subject |
+|---|---|
+| [`findings/ATLAS-ti-26-Conformance-Findings.md`](findings/ATLAS-ti-26-Conformance-Findings.md) | ATLAS.ti 26.1.2 -- six divergences from REFI-QDA v1.5, incl. a container defect that blocks reading real exports, memos losing authorship, and unstable identifiers across exports |
+
+Hand-written reports live in `findings/` and are committed. Machine-generated
+diff reports go to `conformance/reports/`, which is gitignored and
+regenerated on every run -- don't confuse the two.
+
+**Note on the ATLAS.ti fixtures:** neither can be opened by
+`refi_qda.parser.parse_qdpx` at all, because ATLAS.ti names the XML inside
+the archive after the project instead of `project.qde` as REFI-QDA v1.5
+p.21/§8.1 require. That defect is pinned by an `xfail(strict=True)` test in
+`tests/test_atlasti_container_naming.py`, so "fixing" it fails the suite on
+purpose: whether a reference implementation should tolerate this is an
+open design question, documented in
+`fixtures/atlasti/README.md`.
 
 ## How it works
 
